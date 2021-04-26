@@ -182,6 +182,7 @@ class tg_watchon_class:
                             await history_download(xx[1], int(xx[2]), int(xx[3]), self.client)
                         except:
                             await event.reply(f'Download Fail {xx[1]}')
+                            pass
                         else:
                             await event.reply(f'Download Complete {xx[1]}')
 
