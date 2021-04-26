@@ -106,38 +106,37 @@ def get_filename(event):
 
 
 async def media_download(entity_id, event, client):
-    
-    if event.media is not None:
-        file_name = get_filename(event)
-        if file_name == False:
-            return
+    file_name = get_filename(event)
+    if file_name == False:
+        return
 
-        file_name = os.path.join(data_storage_path, str(
-            entity_id), file_name)
-        if checkFileExist(file_name):
-            return 
-        logger.critical(f'Start Download File: {file_name}')
-        try:
-            await client.download_media(event.media, file_name)
-        except:
-            os.remove(file_name)
-        else:
-            logger.critical(f'Finish Download File: {file_name}')
+    file_name = os.path.join(data_storage_path, str(
+        entity_id), file_name)
+    if checkFileExist(file_name):
+        return 
+    logger.critical(f'Start Download File: {file_name}')
+    try:
+        await client.download_media(event.media, file_name)
+    except:
+        os.remove(file_name)
+    else:
+        logger.critical(f'Finish Download File: {file_name}')
 
 
 async def history_download(chat_id, offset_id, limit, client):
     entity = await client.get_entity(chat_id)
     async for event in client.iter_messages(entity, offset_id=offset_id, reverse=True, limit=limit):
-        try:
-            await media_download(entity.id, event, client)
-        except:
-            if error_notice:
-                await client.forward_messages(error_notice, event)
-            pass
-        else:
-            if forward_channel:
-                await client.forward_messages(forward_channel, event)
-            pass
+        if event.media is not None:
+            try:
+                await media_download(entity.id, event, client)
+            except:
+                if error_notice:
+                    await client.forward_messages(error_notice, event)
+                pass
+            else:
+                if forward_channel:
+                    await client.forward_messages(forward_channel, event)
+                pass
 
 
 
@@ -173,20 +172,19 @@ class tg_watchon_class:
 
             logger.info(
                 f'sender: {str(event.input_sender)} to: {str(event.message.to_id)}')
-            # if event.raw_text == '/history' and entity.id == :
 
             if entity.id in self.wltlist:
-                # if event.raw_text == '':
-                try:
-                    await media_download(entity.id, event, self.client)
-                except Exception as e:
-                    if error_notice:
-                        await self.client.forward_messages(error_notice, event.message)
-                    pass
-                else:
-                    if forward_channel:
-                        await self.client.forward_messages(forward_channel, event.message)
-                    pass
+                if event.media is not None:
+                    try:
+                        await media_download(entity.id, event, self.client)
+                    except Exception as e:
+                        if error_notice:
+                            await self.client.forward_messages(error_notice, event.message)
+                        pass
+                    else:
+                        if forward_channel:
+                            await self.client.forward_messages(forward_channel, event.message)
+                        pass
 
             # if not event.raw_text == '':
             #     msg = 'sender: ' + str(event.input_sender) + ' #### to: ' + str(
