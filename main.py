@@ -1,5 +1,5 @@
 from telethon import TelegramClient, sync, errors, events, utils
-from telethon.tl.types import PeerChannel, MessageMediaWebPage, PeerChat
+from telethon.tl.types import PeerChannel, MessageMediaWebPage, PeerChat,InputPeerUser
 from telethon.tl.functions.messages import ForwardMessagesRequest
 from telethon.tl.functions.messages import SendMessageRequest
 from telethon.tl.functions.account import UpdateStatusRequest
@@ -13,11 +13,22 @@ import os
 import logging
 import time
 import re
+import json
 from multiprocessing import Process, cpu_count
 from conf import config
 from log import get_logger
 
 from logging.handlers import RotatingFileHandler
+
+
+def writefile(fileURI, str):
+    with open(fileURI, 'w', encoding='UTF-8') as w:
+        w.write(str)
+
+
+def readfile(fileURI):
+    with open(fileURI, 'r', encoding='UTF-8') as r:
+        return r.read()
 
 def format_filename(f):
     f = re.sub(
@@ -29,6 +40,13 @@ def format_filename(f):
         pass
     return f
 
+def get_random_file_name():
+    H = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+    salt = ''
+    for i in range(22):
+        salt += random.choice(H)
+    t_dir = time.strftime("%Y-%m-%d", time.localtime())
+    return salt
 
 def checkFileExist(fileURI):
     if os.path.isfile(fileURI):
@@ -51,7 +69,6 @@ def format_filename(f):
         pass
     return f
 
-# 下载 history 不是实时监听 实时监听在 `tg_watchon_class`
 def get_filename(event):
     file_name = ''
     if event.document:
@@ -73,7 +90,7 @@ def get_filename(event):
     if event.photo:
         file_name = f'{event.photo.id}.jpg'
     elif file_name == '':
-        file_name = config().get_random_file_name()
+        file_name = get_random_file_name()
         _extension = str(event.media.document.mime_type)
         _extension = _extension.split('/')[-1]
         file_name = f'{file_name}.{_extension}'
@@ -81,92 +98,96 @@ def get_filename(event):
     if not event.raw_text == '':
         file_name = str(event.raw_text).replace(
             '\n', ' ') + ' ' + file_name
-
+    if any(_name in file_name for _name in file_block):
+        return False
     _file_name, _extension = os.path.splitext(file_name)
     file_name = f'{event.id} - {format_filename(_file_name)}{_extension}'
     return file_name
 
-def history_download(chat_id, offset_id, limit, client):
-    entity = client.get_entity(chat_id)
-    for event in client.iter_messages(entity, offset_id=offset_id, reverse=True, limit=limit):
-        if event.media is not None:
-            file_name = get_filename(event)
-            file_name = os.path.join(data_storage_path, str(
-                entity.id), file_name)
-            if checkFileExist(file_name):
-                continue
-            msg = 'File: ' + file_name
-            logger.critical(f'{msg}')
-            try:
-                client.download_media(event.media, file_name)
-            except (ValueError,Exception) as e:
-                msg = f'{event.id}:{file_name} - {e}'
-                logger.error(f'{msg}')
-                pass
-            except KeyboardInterrupt:
-                os.remove(file_name)
-                exit()
-            except:
-                msg = f'{event.id}:{file_name}'
-                logger.error(f'{msg}')
-                os.remove(file_name)
-                pass
+
+async def media_download(entity_id, event, client):
+    
+    if event.media is not None:
+        file_name = get_filename(event)
+        if file_name == False:
+            return
+
+        file_name = os.path.join(data_storage_path, str(
+            entity_id), file_name)
+        if checkFileExist(file_name):
+            return 
+        logger.critical(f'Start Download File: {file_name}')
+        try:
+            await client.download_media(event.media, file_name)
+        except:
+            os.remove(file_name)
+        else:
+            logger.critical(f'Finish Download File: {file_name}')
+
+
+async def history_download(chat_id, offset_id, limit, client):
+    entity = await client.get_entity(chat_id)
+    async for event in client.iter_messages(entity, offset_id=offset_id, reverse=True, limit=limit):
+        try:
+            await media_download(entity.id, event, client)
+        except:
+            if error_notice:
+                await client.forward_messages(error_notice, event)
+            pass
+        else:
+            if forward_channel:
+                await client.forward_messages(forward_channel, event)
+            pass
+
+
 
 
 class tg_watchon_class:
 
     def __init__(self):
-        self.data_storage_path = config().getpath()
-        self.api_id = config().get_api()
-        self.api_hash = config().get_api_hash()
-        self.whiltlist = []
+        
+        self.api_id = conf['api']
+        self.api_hash = conf['api_hash']
+
+        self.wltlist = []
 
         self.client = TelegramClient('some_name', self.api_id, self.api_hash,
                                      proxy=(socks.SOCKS5, '192.168.12.230', 1083)).start()
 
-        wailtlist = config().get_whiltlist()
-
-        for wlt in wailtlist['channels']:
-            self.whiltlist.append(PeerChannel(wlt))
-
-        for wlt in wailtlist['chats']:
-            self.whiltlist.append(PeerChat(wlt))
+        for wlt in whiltlist:
+            entity = self.client.get_entity(wlt)
+            self.wltlist.append(entity.id)
 
         @self.client.on(events.NewMessage)
         async def handler(event):
             # print("handler init success")
             # print('sender: ' + str(event.input_sender) + 'to: ' + str(event.message.to_id))
-            # entity = await self.client.get_entity(event.message.to_id)
+            entity = await self.client.get_entity(event.message.to_id)
+            sender = await event.get_sender()
             # logger.error(f'entity.id: {entity.id}')
+            if sender.id == admin_id and event.raw_text == '/history':
+                for xx in history:
+                    await history_download(xx[0], xx[1], xx[2], self.client)
+                await self.client.send_message(InputPeerUser(
+                    sender.id, sender.access_hash), 'Download Complete')
 
-            logger.error(f'sender: {str(event.input_sender)} to: {str(event.message.to_id)}')
+            logger.info(
+                f'sender: {str(event.input_sender)} to: {str(event.message.to_id)}')
+            # if event.raw_text == '/history' and entity.id == :
 
-            if event.message.to_id in self.whiltlist:
+            if entity.id in self.wltlist:
                 # if event.raw_text == '':
-                if event.media is not None:
-                    
-                    file_name = get_filename(event)
+                try:
+                    await media_download(entity.id, event, self.client)
+                except Exception as e:
+                    if error_notice:
+                        await self.client.forward_messages(error_notice, event.message)
+                    pass
+                else:
+                    if forward_channel:
+                        await self.client.forward_messages(forward_channel, event.message)
+                    pass
 
-                    t_dir = time.strftime("%Y-%m-%d", time.localtime())
-                    file_name = os.path.join(self.data_storage_path, str(
-                        event.message.to_id), t_dir, file_name)
-                    msg = 'File: ' + file_name
-                    logger.critical(f'{msg}')
-                    try:
-                        await self.client.download_media(event.media, file_name)
-                    except errors.TimeoutError as e:
-                        msg = f'{event.id}:{file_name} - errors.TimeoutError {e}'
-                        logger.error(f'{msg}')
-                        os.remove(file_name)
-                        pass
-                    except (ValueError,Exception) as e:
-                        msg = f'{event.id}:{file_name} - {e}'
-                        logger.error(f'{msg}')
-                        os.remove(file_name)
-                        pass
-                    except:
-                        os.remove(file_name)
-                        pass
             # if not event.raw_text == '':
             #     msg = 'sender: ' + str(event.input_sender) + ' #### to: ' + str(
             #         event.message.to_id) + ' #### Message: ' + event.raw_text
@@ -181,26 +202,17 @@ class tg_watchon_class:
 
 
 if __name__ == '__main__':
-    data_storage_path = config().getpath()
-    logger = get_logger(__name__, 'INFO')
+    conf = json.loads(readfile(os.path.join(os.getcwd(), 'conf.json')))
+    data_storage_path = os.path.join(os.getcwd(), 'data_online')
+    logger = get_logger(__name__, 'WARNING')
+
+    history = conf['history']
+    error_notice = conf['error_notice']
+    forward_channel = conf['forward_channel']
+    file_block = conf['filename_block']
+    whiltlist = conf['whiltlist']
+    admin_id = conf['admin_id']
 
     t = tg_watchon_class()
+    t.start()
 
-    p_list = []
-
-    history = (
-        ('https://t.me/tanhuaba', 1525, 999),
-        ('https://t.me/sexinchina', 29434, 999),
-        # ('https://t.me/joinchat/v22MnDcDTjoyZTdl', 1, 999)
-    )
-    for xx in history:
-        p_list.append(Process(target=history_download(
-            xx[0], xx[1], xx[2], t.get_client())))
-        # p_list.append(tg_download_class(xx[0],xx[1],xx[2]))
-
-    p_list.append(Process(target=t.start()))
-    # 独立启动监听
-    for xx in p_list:
-        xx.start()
-    for xx in p_list:
-        xx.join()
