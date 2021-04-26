@@ -86,7 +86,7 @@ def get_filename(event):
     if not event.raw_text == '':
         file_name = str(event.raw_text).replace(
             '\n', ' ') + ' ' + file_name
-    if any(_name in file_name for _name in file_block):
+    if any(_name in file_name for _name in conf['filename_block']):
         return False
     _file_name, _extension = os.path.splitext(file_name)
     file_name = f'{event.id} - {format_filename(_file_name)}{_extension}'
@@ -120,12 +120,12 @@ async def history_download(chat_id, offset_id, limit, client):
             try:
                 await media_download(entity.id, event, client)
             except:
-                if error_notice:
-                    await client.forward_messages(error_notice, event)
+                if conf['error_notice']:
+                    await client.forward_messages(conf['error_notice'], event)
                 pass
             else:
-                if forward_channel:
-                    await client.forward_messages(forward_channel, event)
+                if conf['forward_channel']:
+                    await client.forward_messages(conf['forward_channel'], event)
                 pass
 
 
@@ -143,7 +143,7 @@ class tg_watchon_class:
         self.client = TelegramClient('some_name', self.api_id, self.api_hash,
                                      proxy=(socks.SOCKS5, '192.168.12.230', 1083)).start()
 
-        for wlt in whiltlist:
+        for wlt in conf['whiltlist']:
             entity = self.client.get_entity(wlt)
             self.wltlist.append(entity.id)
 
@@ -154,10 +154,10 @@ class tg_watchon_class:
             entity = await self.client.get_entity(event.message.to_id)
             sender = await event.get_sender()
             # logger.error(f'entity.id: {entity.id}')
-            if sender.id == admin_id:
+            if sender.id == conf['admin_id']:
                 raw_text = event.raw_text.strip()
                 if raw_text.strip().startswith('/history'):
-                    for xx in history:
+                    for xx in conf['history']:
                         await event.reply(f'Start Download {xx[0]}')
                         # await self.client.send_message(InputPeerUser(
                         #     sender.id, sender.access_hash), f'Start Download {xx[0]}')
@@ -191,6 +191,12 @@ class tg_watchon_class:
                 elif raw_text.startswith('/help'):
                     await event.reply(f'下载指定频道历史媒体文件 /download 频道链接 开始id 数量\n下载配置中频道历史文件/history')
                     return
+                elif raw_text.startswith('/reload'):
+                    global conf
+                    conf = json.loads(readfile(os.path.join(os.getcwd(), 'conf.json')))
+                    await event.reply(f'重载config.json')
+                    return
+
 
             logger.info(
                 f'sender: {str(event.input_sender)} to: {str(event.message.to_id)}')
@@ -200,12 +206,12 @@ class tg_watchon_class:
                     try:
                         await media_download(entity.id, event, self.client)
                     except Exception as e:
-                        if error_notice:
-                            await self.client.forward_messages(error_notice, event.message)
+                        if conf['error_notice']:
+                            await self.client.forward_messages(conf['error_notice'], event.message)
                         pass
                     else:
-                        if forward_channel:
-                            await self.client.forward_messages(forward_channel, event.message)
+                        if conf['forward_channel']:
+                            await self.client.forward_messages(conf['forward_channel'], event.message)
                         pass
 
             # if not event.raw_text == '':
@@ -222,16 +228,12 @@ class tg_watchon_class:
 
 
 if __name__ == '__main__':
-    conf = json.loads(readfile(os.path.join(os.getcwd(), 'conf.json')))
+    
     data_storage_path = os.path.join(os.getcwd(), 'data_online')
     logger = get_logger(__name__, 'WARNING')
 
-    history = conf['history']
-    error_notice = conf['error_notice']
-    forward_channel = conf['forward_channel']
-    file_block = conf['filename_block']
-    whiltlist = conf['whiltlist']
-    admin_id = conf['admin_id']
+    conf = json.loads(readfile(os.path.join(os.getcwd(), 'conf.json')))
 
     t = tg_watchon_class()
     t.start()
+
