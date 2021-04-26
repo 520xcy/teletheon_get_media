@@ -154,13 +154,36 @@ class tg_watchon_class:
             entity = await self.client.get_entity(event.message.to_id)
             sender = await event.get_sender()
             # logger.error(f'entity.id: {entity.id}')
-            if sender.id == admin_id and event.raw_text == '/history':
-                for xx in history:
-                    await self.client.send_message(InputPeerUser(
-                        sender.id, sender.access_hash), f'Start Download {xx[0]}')
-                    await history_download(xx[0], xx[1], xx[2], self.client)
-                    await self.client.send_message(InputPeerUser(
-                        sender.id, sender.access_hash), f'Download Complete {xx[0]}')
+            if sender.id == admin_id:
+                raw_text = event.raw_text.strip()
+                if raw_text.strip().startswith('/history'):
+                    for xx in history:
+                        await event.reply(f'Start Download {xx[0]}')
+                        # await self.client.send_message(InputPeerUser(
+                        #     sender.id, sender.access_hash), f'Start Download {xx[0]}')
+                        try:
+                            await history_download(xx[0], xx[1], xx[2], self.client)
+                        except:
+                            await event.reply(f'Download Fail {xx[0]}')
+                            pass
+                        else:
+                            await event.reply(f'Download Complete {xx[0]}')
+
+                        # await self.client.send_message(InputPeerUser(
+                        #     sender.id, sender.access_hash), f'Download Complete {xx[0]}')
+                if raw_text.startswith('/download'):
+                    xx = raw_text.split(' ')
+                    print(xx)
+                    if len(xx)<4:
+                        await event.reply(f'命令格式错误 /download 频道链接 开始id 数量')
+                    else:
+                        await event.reply(f'Start Download {xx[1]}')
+                        try:
+                            await history_download(xx[1], int(xx[2]), int(xx[3]), self.client)
+                        except:
+                            await event.reply(f'Download Fail {xx[1]}')
+                        else:
+                            await event.reply(f'Download Complete {xx[1]}')
 
             logger.info(
                 f'sender: {str(event.input_sender)} to: {str(event.message.to_id)}')
