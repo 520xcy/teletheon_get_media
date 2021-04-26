@@ -119,6 +119,8 @@ async def media_download(entity_id, event, client):
         await client.download_media(event.media, file_name)
     except:
         os.remove(file_name)
+        logger.error(f'{entity_id}:{file_name}')
+        raise
     else:
         logger.critical(f'Finish Download File: {file_name}')
 
