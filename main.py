@@ -54,20 +54,8 @@ def checkFileExist(fileURI):
         return True
     return False
 
-
 def get_local_time():
     return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-
-
-def format_filename(f):
-    f = re.sub(
-        u"([^\u4e00-\u9fa5\u0030-\u0039\u0041-\u005a\u0061-\u007a])", "", f)
-    try:
-        while len(f.encode('utf-8')) > 210:
-            f = f[0:-1]
-    except:
-        pass
-    return f
 
 def get_filename(event):
     file_name = ''
@@ -168,9 +156,11 @@ class tg_watchon_class:
             # logger.error(f'entity.id: {entity.id}')
             if sender.id == admin_id and event.raw_text == '/history':
                 for xx in history:
+                    await self.client.send_message(InputPeerUser(
+                        sender.id, sender.access_hash), f'Start Download {xx[0]}')
                     await history_download(xx[0], xx[1], xx[2], self.client)
-                await self.client.send_message(InputPeerUser(
-                    sender.id, sender.access_hash), 'Download Complete')
+                    await self.client.send_message(InputPeerUser(
+                        sender.id, sender.access_hash), f'Download Complete {xx[0]}')
 
             logger.info(
                 f'sender: {str(event.input_sender)} to: {str(event.message.to_id)}')
