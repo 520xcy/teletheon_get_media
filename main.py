@@ -134,7 +134,6 @@ async def history_download(chat_id, offset_id, limit, client):
 class tg_watchon_class:
 
     def __init__(self):
-        
         self.api_id = conf['api']
         self.api_hash = conf['api_hash']
 
@@ -149,6 +148,8 @@ class tg_watchon_class:
 
         @self.client.on(events.NewMessage)
         async def handler(event):
+            global conf
+
             # print("handler init success")
             # print('sender: ' + str(event.input_sender) + 'to: ' + str(event.message.to_id))
             entity = await self.client.get_entity(event.message.to_id)
@@ -189,10 +190,9 @@ class tg_watchon_class:
                     return
 
                 elif raw_text.startswith('/help'):
-                    await event.reply(f'下载指定频道历史媒体文件 /download 频道链接 开始id 数量\n下载配置中频道历史文件/history')
+                    await event.reply(f'下载指定频道历史媒体文件 /download 频道链接 开始id 数量\n下载配置中频道历史文件/history\n重载config.json文件(api设置重载无效)')
                     return
                 elif raw_text.startswith('/reload'):
-                    global conf
                     conf = json.loads(readfile(os.path.join(os.getcwd(), 'conf.json')))
                     await event.reply(f'重载config.json')
                     return
@@ -236,4 +236,3 @@ if __name__ == '__main__':
 
     t = tg_watchon_class()
     t.start()
-
