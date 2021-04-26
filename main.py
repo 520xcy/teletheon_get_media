@@ -168,10 +168,11 @@ class tg_watchon_class:
                             pass
                         else:
                             await event.reply(f'Download Complete {xx[0]}')
+                    return
 
                         # await self.client.send_message(InputPeerUser(
                         #     sender.id, sender.access_hash), f'Download Complete {xx[0]}')
-                if raw_text.startswith('/download'):
+                elif raw_text.startswith('/download'):
                     xx = raw_text.split(' ')
                     print(xx)
                     if len(xx)<4:
@@ -185,6 +186,11 @@ class tg_watchon_class:
                             pass
                         else:
                             await event.reply(f'Download Complete {xx[1]}')
+                    return
+
+                elif raw_text.startswith('/help'):
+                    await event.reply(f'下载指定频道历史媒体文件 /download 频道链接 开始id 数量\n下载配置中频道历史文件/history')
+                    return
 
             logger.info(
                 f'sender: {str(event.input_sender)} to: {str(event.message.to_id)}')
@@ -229,4 +235,3 @@ if __name__ == '__main__':
 
     t = tg_watchon_class()
     t.start()
-
