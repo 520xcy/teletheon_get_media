@@ -1,5 +1,5 @@
 from telethon import TelegramClient, sync, errors, events, utils
-from telethon.tl.types import PeerChannel, MessageMediaWebPage, PeerChat,InputPeerUser
+from telethon.tl.types import PeerChannel, MessageMediaWebPage, PeerChat, InputPeerUser
 from telethon.tl.functions.messages import ForwardMessagesRequest
 from telethon.tl.functions.messages import SendMessageRequest
 from telethon.tl.functions.account import UpdateStatusRequest
@@ -15,6 +15,7 @@ import re
 import json
 from log import get_logger
 
+
 class tg_watchon_class:
 
     def __init__(self):
@@ -27,9 +28,10 @@ class tg_watchon_class:
 
         if self.conf['proxyhost'] and self.conf['proxyport']:
             self.client = TelegramClient('some_name', self.api_id, self.api_hash,
-                                     proxy=(socks.SOCKS5, self.conf['proxyhost'], self.conf['proxyport'])).start()
+                                         proxy=(socks.SOCKS5, self.conf['proxyhost'], self.conf['proxyport'])).start()
         else:
-            self.client = TelegramClient('some_name', self.api_id, self.api_hash).start()
+            self.client = TelegramClient(
+                'some_name', self.api_id, self.api_hash).start()
 
         for wlt in self.conf['whiltlist']:
             entity = self.client.get_entity(wlt)
@@ -39,59 +41,20 @@ class tg_watchon_class:
         async def handler(event):
             # print("handler init success")
             # print('sender: ' + str(event.input_sender) + 'to: ' + str(event.message.to_id))
-            entity = await self.client.get_entity(event.message.to_id)
-            sender = await event.get_sender()
-            # logger.error(f'entity.id: {entity.id}')
-            if sender.id == self.conf['admin_id']:
-                raw_text = event.raw_text.strip()
-                if raw_text.strip().startswith('/history'):
-                    for xx in self.conf['history']:
-                        await event.reply(f'Start Download {xx[0]}')
-                        # await self.client.send_message(InputPeerUser(
-                        #     sender.id, sender.access_hash), f'Start Download {xx[0]}')
-                        try:
-                            await self.history_download(xx[0], xx[1], xx[2])
-                        except:
-                            await event.reply(f'Download Fail {xx[0]}')
-                            pass
-                        else:
-                            await event.reply(f'Download Complete {xx[0]}')
-                    return
-
-                        # await self.client.send_message(InputPeerUser(
-                        #     sender.id, sender.access_hash), f'Download Complete {xx[0]}')
-                elif raw_text.startswith('/download'):
-                    xx = raw_text.split(' ')
-                    print(xx)
-                    if len(xx)<4:
-                        await event.reply(f'命令格式错误 /download 频道链接 开始id 数量')
-                    else:
-                        await event.reply(f'Start Download {xx[1]}')
-                        try:
-                            await self.history_download(xx[1], int(xx[2]), int(xx[3]))
-                        except:
-                            await event.reply(f'Download Fail {xx[1]}')
-                            pass
-                        else:
-                            await event.reply(f'Download Complete {xx[1]}')
-                    return
-
-                elif raw_text.startswith('/help'):
-                    await event.reply(f'下载指定频道历史媒体文件: /download 频道链接 开始id 数量\n下载配置中频道历史文件: /history\n重载config.json文件(api设置重载无效): /reload')
-                    return
-                elif raw_text.startswith('/reload'):
-                    self.conf = self.get_conf()
-                    await event.reply(f'重载config.json')
-                    return
-
-
             logger.info(
                 f'sender: {str(event.input_sender)} to: {str(event.message.to_id)}')
-
-            if entity.id in self.wltlist:
-                if event.media is not None:
+            peer_id = event.message.peer_id
+            if str(peer_id).startswith('PeerUser'):
+                entity_id = peer_id.user_id
+                if entity_id == self.conf['admin_id']:
+                    await self.text_command(event)
+                return
+            else:
+                entity_id = peer_id.channel_id
+                print(entity_id, self.wltlist)
+                if entity_id in self.wltlist and event.media is not None:
                     try:
-                        await self.media_download(entity.id, event)
+                        await self.media_download(entity_id, event)
                     except Exception as e:
                         if self.conf['error_notice']:
                             await self.client.forward_messages(self.conf['error_notice'], event.message)
@@ -143,6 +106,49 @@ class tg_watchon_class:
         else:
             logger.critical(f'Finish Download File: {file_name}')
 
+    async def text_command(self, event):
+        # sender = await event.get_sender()
+        # logger.error(f'entity.id: {entity.id}')
+        
+        raw_text = event.raw_text.strip()
+        if raw_text.strip().startswith('/history'):
+            for xx in self.conf['history']:
+                await event.reply(f'Start Download {xx[0]}')
+                # await self.client.send_message(InputPeerUser(
+                #     sender.id, sender.access_hash), f'Start Download {xx[0]}')
+                try:
+                    await self.history_download(xx[0], xx[1], xx[2])
+                except:
+                    await event.reply(f'Download Fail {xx[0]}')
+                    pass
+                else:
+                    await event.reply(f'Download Complete {xx[0]}')
+            return
+
+            # await self.client.send_message(InputPeerUser(
+            #     sender.id, sender.access_hash), f'Download Complete {xx[0]}')
+        elif raw_text.startswith('/download'):
+            xx = raw_text.split(' ')
+            print(xx)
+            if len(xx) < 4:
+                await event.reply(f'命令格式错误 /download 频道链接 开始id 数量')
+            else:
+                await event.reply(f'Start Download {xx[1]}')
+                try:
+                    await self.history_download(xx[1], int(xx[2]), int(xx[3]))
+                except:
+                    await event.reply(f'Download Fail {xx[1]}')
+                    pass
+                else:
+                    await event.reply(f'Download Complete {xx[1]}')
+            return
+
+        elif raw_text.startswith('/help'):
+            await event.reply(f'下载指定频道历史媒体文件: /download 频道链接 开始id 数量\n下载配置中频道历史文件: /history\n重载config.json文件(api设置重载无效): /reload')
+            return
+        elif raw_text.startswith('/reload'):
+            self.conf = self.get_conf()
+            await event.reply(f'重载config.json')
 
     def get_filename(self, event):
         file_name = ''
@@ -199,7 +205,7 @@ class tg_watchon_class:
         except:
             pass
         return f
-    
+
     def get_random_file_name(self):
         H = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
         salt = ''
@@ -208,10 +214,11 @@ class tg_watchon_class:
         t_dir = time.strftime("%Y-%m-%d", time.localtime())
         return salt
 
+
 if __name__ == '__main__':
-    
+
     data_storage_path = os.path.join(os.getcwd(), 'data_online')
-    logger = get_logger(__name__, 'WARNING')
+    logger = get_logger(__name__, 'INFO')
 
     t = tg_watchon_class()
     t.start()
