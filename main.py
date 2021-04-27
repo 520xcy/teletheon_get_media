@@ -77,11 +77,11 @@ class tg_watchon_class:
                     return
 
                 elif raw_text.startswith('/help'):
-                    await event.reply(f'下载指定频道历史媒体文件 /download 频道链接 开始id 数量\n下载配置中频道历史文件/history\n重载config.json文件(api设置重载无效)')
+                    await event.reply(f'下载指定频道历史媒体文件: /download 频道链接 开始id 数量\n下载配置中频道历史文件: /history\n重载config.json文件(api设置重载无效): /reload')
                     return
                 elif raw_text.startswith('/reload'):
                     self.conf = self.get_conf()
-                    await event.reply(f'重载config.json /reload')
+                    await event.reply(f'重载config.json')
                     return
 
 
