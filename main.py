@@ -33,6 +33,9 @@ class tg_watchon_class:
 
         self.download = []
 
+        if not os.path.exists(self.data_storage_path):
+            os.mkdir(self.data_storage_path)
+
         if self.conf['proxyhost'] and self.conf['proxyport']:
             self.client = TelegramClient('some_name', self.api_id, self.api_hash,
                                          proxy=(socks.SOCKS5, self.conf['proxyhost'], self.conf['proxyport'])).start()
@@ -76,20 +79,20 @@ class tg_watchon_class:
                 await self.text_command(event)
                 return
 
-            if from_id in self.watchuser and event.media is not None and self.conf['autodownload']:
+            if from_id in self.watchuser and event.media is not None:
                 await self.media_download(entity_id=from_id, event=event, is_user=True)
                 return
 
             if event.fwd_from is not None:
                 from_id = event.fwd_from.saved_from_peer.channel_id if str(
                     event.fwd_from.saved_from_peer).startswith('PeerChannel') else None
-                if from_id in self.watchchannel and event.media is not None and self.conf['autodownload']:
+                if from_id in self.watchchannel and event.media is not None:
                     await self.media_download(entity_id=from_id, event=event, is_savefrom=True)
 
             from_id = event.peer_id.channel_id if str(
                 event.peer_id).startswith('PeerChannel') else None
 
-            if from_id in self.watchchannel and event.media is not None and self.conf['autodownload']:
+            if from_id in self.watchchannel and event.media is not None:
                 await self.media_download(entity_id=from_id, event=event)
 
     async def history_download(self, chat_id, offset_id, limit):
@@ -103,6 +106,7 @@ class tg_watchon_class:
 
     async def media_download(self, entity_id, event, history=False, need_forward=True, is_user=False, is_savefrom=False):
         try:
+            offset = 0
             file_name = self.get_filename(event, is_user, is_savefrom)
             if file_name == False:
                 return False
@@ -115,39 +119,51 @@ class tg_watchon_class:
                 except:
                     pass
             file_id = file_name[1]
-            file_name = os.path.join(self.data_storage_path, str(
-                entity_id), file_name[0])
 
-            if os.path.isfile(file_name):
-                logger.critical(f'文件已存在:{file_name}')
-                return False
+            _dir = os.path.join(self.data_storage_path, str(entity_id))
+            if not os.path.exists(_dir):
+                os.makedirs(_dir)
+
+            file_name = os.path.join(_dir, file_name[0])
 
             if not is_user and self.db_check(str(entity_id), file_id):
                 logger.critical(f'数据库已存在:{file_name}')
                 return False
 
+            if os.path.isfile(file_name):
+                logger.critical(f'文件已存在:{file_name}')
+                return False
+
+            if os.path.isfile(file_name+'.download'):
+                offset = os.path.getsize(file_name+'.download')
+
             logger.critical(f'Start Download File: {file_name}')
             try:
                 self.download.append(file_name)
-                await self.client.download_media(event.media, file_name)
-            except:
-                os.remove(file_name)
-                logger.error(f'{entity_id}:{file_name}')
+                print(offset)
+                with open(file_name+'.download', 'ab+') as fd:
+                    async for chunk in self.client.iter_download(event.media, offset=offset):
+                        fd.write(chunk)
+                # await self.client.download_media(event.media, file_name)
+            except Exception as e:
+                # os.remove(file_name)
+                logger.error(f'{e},{entity_id}:{file_name}')
                 raise
             else:
+                os.rename(file_name+'.download', file_name)
                 logger.critical(f'Finish Download File: {file_name}')
                 if not is_user:
                     self.db_write(str(entity_id), file_id)
             finally:
                 self.download.remove(file_name)
-        except:
+        except Exception as e:
             if self.error_notice:
                 try:
                     if history:
                         await self.client.forward_messages(self.error_notice, event)
                     else:
                         await self.client.forward_messages(self.error_notice, event.message)
-                    await self.client.send_message(self.error_notice, f'user: {entity_id} - {event.id}')
+                    await self.client.send_message(self.error_notice, f'error: {e},user: {entity_id} - {event.id}')
                 except:
                     pass
             raise
