@@ -1,7 +1,6 @@
 {
     "api":0,
     "api_hash": "",
-    "autodownload": true,
     "proxyhost": "", #socks5代理服务器ip
     "proxyport": 0, #socks5代理服务器端口
     "whiltlist": [
