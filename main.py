@@ -76,20 +76,20 @@ class tg_watchon_class:
                 await self.text_command(event)
                 return
 
-            if from_id in self.watchuser and event.media is not None:
+            if from_id in self.watchuser and event.media is not None and self.conf['autodownload']:
                 await self.media_download(entity_id=from_id, event=event, is_user=True)
                 return
 
             if event.fwd_from is not None:
                 from_id = event.fwd_from.saved_from_peer.channel_id if str(
                     event.fwd_from.saved_from_peer).startswith('PeerChannel') else None
-                if from_id in self.watchchannel and event.media is not None:
+                if from_id in self.watchchannel and event.media is not None and self.conf['autodownload']:
                     await self.media_download(entity_id=from_id, event=event, is_savefrom=True)
 
             from_id = event.peer_id.channel_id if str(
                 event.peer_id).startswith('PeerChannel') else None
 
-            if from_id in self.watchchannel and event.media is not None:
+            if from_id in self.watchchannel and event.media is not None and self.conf['autodownload']:
                 await self.media_download(entity_id=from_id, event=event)
 
     async def history_download(self, chat_id, offset_id, limit):
