@@ -37,8 +37,8 @@ class tg_watchon_class:
             os.mkdir(self.data_storage_path)
 
         if self.conf['proxyhost'] and self.conf['proxyport']:
-            self.client = TelegramClient('some_name', self.api_id, self.api_hash,
-                                         proxy=(socks.SOCKS5, self.conf['proxyhost'], self.conf['proxyport'])).start()
+            self.client = TelegramClient('some_name', self.api_id, self.api_hash, proxy={
+                                         'proxy_type': 'socks5', 'addr': self.conf['proxyhost'], 'port': self.conf['proxyport']}).start()
         else:
             self.client = TelegramClient(
                 'some_name', self.api_id, self.api_hash).start()
@@ -148,7 +148,6 @@ class tg_watchon_class:
             logger.critical(f'Start Download File: {file_name}')
             try:
                 self.download.append(file_name)
-                print(offset)
                 with open(file_name+'.download', 'ab+') as fd:
                     async for chunk in self.client.iter_download(event.media, offset=offset):
                         fd.write(chunk)
