@@ -95,14 +95,22 @@ class tg_watchon_class:
             if from_id in self.watchchannel and event.media is not None:
                 await self.media_download(entity_id=from_id, event=event)
 
-    async def history_download(self, chat_id, offset_id, limit):
+    async def history_download(self, chat_id, offset_id: int, limit: int):
         entity = await self.client.get_entity(chat_id)
-        async for event in self.client.iter_messages(entity, offset_id=offset_id, reverse=True, limit=limit):
+        for ids in range(offset_id, offset_id+limit):
+            event = await self.client.get_messages(entity, ids=ids)
             try:
                 if event.media is not None:
                     await self.media_download(entity_id=entity.id, event=event, history=True, need_forward=False)
             except:
                 pass
+
+        # async for event in self.client.iter_messages(entity, offset_id=offset_id, reverse=True, limit=limit):
+        #     try:
+        #         if event.media is not None:
+        #             await self.media_download(entity_id=entity.id, event=event, history=True, need_forward=False)
+        #     except:
+        #         pass
 
     async def media_download(self, entity_id, event, history=False, need_forward=True, is_user=False, is_savefrom=False):
         try:
