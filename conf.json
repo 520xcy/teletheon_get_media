@@ -3,6 +3,7 @@
     "api_hash": "",
     "proxyhost": "", #socks5代理服务器ip
     "proxyport": 0, #socks5代理服务器端口
+    "break": 100, #历史下载时连续多少空数据时跳出下载
     "whiltlist": [
         "监听频道1的分享链接",
         "监听频道2的分享链接"
