@@ -26,6 +26,7 @@ class tg_watchon_class:
         self.historydb = os.path.join(self.project_path, 'history.shelve')
         self.conf = self.get_conf()
         self.api_id = self.conf['api']
+        self.breakcount = self.conf['break'] or 100
         self.api_hash = self.conf['api_hash']
         self.watchchannel = []
         self.watchuser = []
@@ -97,8 +98,15 @@ class tg_watchon_class:
 
     async def history_download(self, chat_id, offset_id: int, limit: int):
         entity = await self.client.get_entity(chat_id)
+        noData = 0
         for ids in range(offset_id, offset_id+limit):
+            if noData > self.breakcount:
+                break
             event = await self.client.get_messages(entity, ids=ids)
+            if not event:
+                noData += 1
+                continue
+            noData = 0
             try:
                 if event.media is not None:
                     await self.media_download(entity_id=entity.id, event=event, history=True, need_forward=False)
