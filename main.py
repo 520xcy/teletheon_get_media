@@ -14,6 +14,7 @@ import time
 import re
 import json
 import shelve
+import shutil
 from log import get_logger
 
 
@@ -255,6 +256,17 @@ class tg_watchon_class:
             strlist = self.cut_text(msg, 4095)
             for r in strlist:
                 await event.reply(r)
+        elif raw_text.startswith('/space'):
+            _dir = os.path.split(os.path.realpath(__file__))[0]
+            _dir = _dir.split(os.sep)
+            if os.sep == '/':
+                _dir = '/'+_dir[1]
+            else:
+                _dir = _dir[0]+':\\'
+            gb = 1024 ** 3
+            total_b, used_b, free_b = shutil.disk_usage(_dir)
+            await event.reply('总磁盘空间: {:6.2f} GB\n已使用: {:6.2f} GB\n未使用  {:6.2f} GB\n'.format(total_b/gb, used_b/gb, free_b/gb))
+
         else:
             await event.reply(str(event))
 
@@ -374,6 +386,5 @@ if __name__ == '__main__':
 
     PROJECT_PATH = os.path.split(os.path.realpath(__file__))[0]
     logger = get_logger(__name__, 'ERROR')
-
     t = tg_watchon_class(PROJECT_PATH)
     t.start()
