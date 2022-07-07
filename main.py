@@ -240,7 +240,7 @@ class tg_watchon_class:
                 raise
 
         elif raw_text.startswith('/help'):
-            await event.reply(f'/download 频道链接 开始id 数量 下载指定频道历史媒体文件\n/history 下载配置中频道历史文件\n/reload 重载config.json文件(api设置重载无效)\n/cfg 显示当前配置\n/status 显示任务下载状态\n/show 显示信息详情')
+            await event.reply(f'/download 频道链接 开始id 数量 下载指定频道历史媒体文件\n/history 下载配置中频道历史文件\n/reload 重载config.json文件(api设置重载无效)\n/cfg 显示当前配置\n/status 显示任务下载状态\n/show 显示信息详情\n/space 显示磁盘使用情况')
             return
         elif raw_text.startswith('/reload'):
             self.conf = self.get_conf()
@@ -257,15 +257,35 @@ class tg_watchon_class:
             for r in strlist:
                 await event.reply(r)
         elif raw_text.startswith('/space'):
-            _dir = os.path.split(os.path.realpath(__file__))[0]
-            _dir = _dir.split(os.sep)
-            if os.sep == '/':
-                _dir = '/'+_dir[1]
-            else:
-                _dir = _dir[0]+':\\'
             gb = 1024 ** 3
-            total_b, used_b, free_b = shutil.disk_usage(_dir)
-            await event.reply('总磁盘空间: {:6.2f} GB\n已使用: {:6.2f} GB\n未使用  {:6.2f} GB\n'.format(total_b/gb, used_b/gb, free_b/gb))
+            if os.name == 'nt':
+                _dir = os.path.split(os.path.realpath(__file__))[0]
+                _dir = _dir.split(os.sep)
+
+                _dir = _dir[0]+':\\'
+
+                total_b, used_b, free_b = shutil.disk_usage(_dir)
+                msg = '总磁盘空间: {:6.2f} GB\n已使用: {:6.2f} GB\n未使用  {:6.2f} GB\n'.format(
+                    total_b/gb, used_b/gb, free_b/gb)
+
+            else:
+                msg = ''
+                result = []
+                f = os.popen('mount')
+                text = f.readlines()
+                f.close()
+                for line in text:
+                    if re.search(r'\bext\d', line):
+                        result.append(line.split()[2])
+                for _path in result:
+                    sv = os.statvfs(_path)
+                    free_b = (sv.f_bavail * sv.f_frsize)
+                    total_b = (sv.f_blocks * sv.f_frsize)
+                    used_b = (sv.f_blocks - sv.f_bfree) * sv.f_frsize
+                    msg += '{} 总磁盘空间: {:6.2f} GB\n已使用: {:6.2f} GB\n未使用  {:6.2f} GB\n\n'.format(
+                        _path, total_b/gb, used_b/gb, free_b/gb)
+
+            await event.reply(msg)
 
         else:
             await event.reply(str(event))
