@@ -282,7 +282,7 @@ class tg_watchon_class:
                     free_b = (sv.f_bavail * sv.f_frsize)
                     total_b = (sv.f_blocks * sv.f_frsize)
                     used_b = (sv.f_blocks - sv.f_bfree) * sv.f_frsize
-                    msg += '{}\n 总磁盘空间: {:6.2f} GB\n已使用: {:6.2f} GB\n未使用  {:6.2f} GB\n\n'.format(
+                    msg += '{}\n总磁盘空间: {:6.2f} GB\n已使用: {:6.2f} GB\n未使用  {:6.2f} GB\n\n'.format(
                         _path, total_b/gb, used_b/gb, free_b/gb)
 
             await event.reply(msg)
