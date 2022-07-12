@@ -17,6 +17,9 @@ import shelve
 import shutil
 from log import get_logger
 
+GB = 1024 ** 3
+MB = 1024 ** 2
+
 
 class tg_watchon_class:
 
@@ -33,7 +36,7 @@ class tg_watchon_class:
         self.watchuser = []
         self.myid = 0
 
-        self.download = []
+        self.download = {}
 
         if not os.path.exists(self.data_storage_path):
             os.mkdir(self.data_storage_path)
@@ -107,7 +110,8 @@ class tg_watchon_class:
             if not event:
                 noData += 1
                 continue
-            noData = 0
+            else:
+                noData = 0
             try:
                 if event.media is not None:
                     await self.media_download(entity_id=entity.id, event=event, history=True, need_forward=False)
@@ -127,6 +131,7 @@ class tg_watchon_class:
             file_name = self.get_filename(event, is_user, is_savefrom)
             if file_name == False:
                 return False
+            file_size = file_name[1]
             if need_forward and self.forward_channel:
                 try:
                     if history:
@@ -135,7 +140,7 @@ class tg_watchon_class:
                         await self.client.forward_messages(self.forward_channel, event.message)
                 except:
                     pass
-            file_id = file_name[1]
+            file_id = file_name[2]
 
             _dir = os.path.join(self.data_storage_path, str(entity_id))
             if not os.path.exists(_dir):
@@ -156,10 +161,12 @@ class tg_watchon_class:
 
             logger.critical(f'Start Download File: {file_name}')
             try:
-                self.download.append(file_name)
+                self.download.update(
+                    {file_name: {'total': file_size, 'now': offset}})
                 with open(file_name+'.download', 'ab+') as fd:
                     async for chunk in self.client.iter_download(event.media, offset=offset):
                         fd.write(chunk)
+                        self.download[file_name]['now'] += len(chunk)
                 # await self.client.download_media(event.media, file_name)
             except Exception as e:
                 # os.remove(file_name)
@@ -171,7 +178,7 @@ class tg_watchon_class:
                 if not is_user:
                     self.db_write(str(entity_id), file_id)
             finally:
-                self.download.remove(file_name)
+                del self.download[file_name]
         except Exception as e:
             if self.error_notice:
                 try:
@@ -191,7 +198,7 @@ class tg_watchon_class:
         # logger.error(f'entity.id: {entity.id}')
 
         raw_text = event.raw_text.strip()
-        if raw_text.strip().startswith('/history'):
+        if raw_text.strip().startswith('/history') or raw_text.startswith('/历史'):
             self.conf = self.get_conf()
             for xx in self.conf['history']:
                 await event.reply(f'Start Download {xx[0]}')
@@ -208,7 +215,7 @@ class tg_watchon_class:
 
             # await self.client.send_message(InputPeerUser(
             #     sender.id, sender.access_hash), f'Download Complete {xx[0]}')
-        elif raw_text.startswith('/download'):
+        elif raw_text.startswith('/download') or raw_text.startswith('/下载'):
             xx = raw_text.split(' ')
             if len(xx) < 4:
                 await event.reply(f'命令格式错误 /download 频道链接 开始id 数量')
@@ -222,7 +229,7 @@ class tg_watchon_class:
                 else:
                     await event.reply(f'Download Complete {xx[1]}')
             return
-        elif raw_text.startswith('/show'):
+        elif raw_text.startswith('/show') or raw_text.startswith('/显示'):
             try:
                 command = raw_text.split(' ')
                 url = command[1]
@@ -239,25 +246,31 @@ class tg_watchon_class:
                 await event.reply(f'命令格式错误 /show 消息链接')
                 raise
 
-        elif raw_text.startswith('/help'):
-            await event.reply(f'/download 频道链接 开始id 数量 下载指定频道历史媒体文件\n/history 下载配置中频道历史文件\n/reload 重载config.json文件(api设置重载无效)\n/cfg 显示当前配置\n/status 显示任务下载状态\n/show 显示信息详情\n/space 显示磁盘使用情况')
+        elif raw_text.startswith('/help') or raw_text.startswith('/帮助'):
+            await event.reply(f'/download(下载) 频道链接 开始id 数量 下载指定频道历史媒体文件\n/history(历史) 下载配置中频道历史文件\n/reload(重载) 重载config.json文件(api设置重载无效)\n/cfg(配置) 显示当前配置\n/status(状态) 显示任务下载状态\n/show(显示) 显示信息详情\n/space(空间) 显示磁盘使用情况')
             return
-        elif raw_text.startswith('/reload'):
+        elif raw_text.startswith('/reload') or raw_text.startswith('/重载'):
             self.conf = self.get_conf()
             await self.init_conf()
             await event.reply(f'重载config.json')
-        elif raw_text.startswith('/cfg'):
+        elif raw_text.startswith('/cfg') or raw_text.startswith('/配置'):
             msg = str(self.__dict__)
             strlist = self.cut_text(msg, 4095)
             for r in strlist:
                 await event.reply(r)
-        elif raw_text.startswith('/status'):
-            msg = str(self.download)
+        elif raw_text.startswith('/status') or raw_text.startswith('/状态'):
+            msg = ''
+            for _file in self.download:
+                msg += '文件名:{}\n总大小:{:6.2f} MB 已下载:{:6.2f} MB\n'.format(
+                    _file,
+                    self.download[_file]['total']/MB,
+                    self.download[_file]['now']/MB
+                )
             strlist = self.cut_text(msg, 4095)
             for r in strlist:
                 await event.reply(r)
-        elif raw_text.startswith('/space'):
-            gb = 1024 ** 3
+        elif raw_text.startswith('/space') or raw_text.startswith('/空间'):
+
             if os.name == 'nt':
                 _dir = os.path.split(os.path.realpath(__file__))[0]
                 _dir = _dir.split(os.sep)
@@ -266,7 +279,7 @@ class tg_watchon_class:
 
                 total_b, used_b, free_b = shutil.disk_usage(_dir)
                 msg = '总磁盘空间: {:6.2f} GB\n已使用: {:6.2f} GB\n未使用  {:6.2f} GB\n'.format(
-                    total_b/gb, used_b/gb, free_b/gb)
+                    total_b/GB, used_b/GB, free_b/GB)
 
             else:
                 msg = ''
@@ -283,7 +296,7 @@ class tg_watchon_class:
                     total_b = (sv.f_blocks * sv.f_frsize)
                     used_b = (sv.f_blocks - sv.f_bfree) * sv.f_frsize
                     msg += '{}\n总磁盘空间: {:6.2f} GB\n已使用: {:6.2f} GB\n未使用  {:6.2f} GB\n\n'.format(
-                        _path, total_b/gb, used_b/gb, free_b/gb)
+                        _path, total_b/GB, used_b/GB, free_b/GB)
 
             await event.reply(msg)
 
@@ -312,10 +325,11 @@ class tg_watchon_class:
 
     def get_filename(self, event, is_user=False, is_savefrom=False):
         file_name = ''
+        file_size = 0
+        if type(event.media) == MessageMediaWebPage:
+            return False
         if event.document:
             try:
-                if type(event.media) == MessageMediaWebPage:
-                    return False
                 if event.media.document.mime_type == "image/webp":
                     file_name = f'{event.media.document.id}.webp'
                 if event.media.document.mime_type == "application/x-tgsticker":
@@ -330,11 +344,16 @@ class tg_watchon_class:
 
         if event.photo:
             file_name = f'{event.photo.id}.jpg'
-        elif file_name == '':
+            # file_size = max(event.photo.sizes[-1]
+        else:
+            file_size = event.media.document.size
+
+        if file_name == '':
             file_name = self.get_random_file_name()
             _extension = str(event.media.document.mime_type)
             _extension = _extension.split('/')[-1]
             file_name = f'{file_name}.{_extension}'
+
         if not event.raw_text == '':
             file_name = str(event.raw_text).replace(
                 '\n', ' ') + ' ' + file_name
@@ -348,7 +367,7 @@ class tg_watchon_class:
         if any(self.str_find(file_name, _name) for _name in self.conf['filename_block']):
             return False
         else:
-            return (file_name, event_id)
+            return (file_name, file_size, event_id)
 
     def str_find(self, s: str, t: str):
         return s.find(t) >= 0
