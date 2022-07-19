@@ -259,7 +259,7 @@ class tg_watchon_class:
             for r in strlist:
                 await event.reply(r)
         elif raw_text.startswith('/status') or raw_text.startswith('/状态'):
-            msg = ''
+            msg = '当前状态\n'
             for _file in self.download:
                 msg += '文件名:{}\n总大小:{:6.2f} MB 已下载:{:6.2f} MB\n'.format(
                     _file,
